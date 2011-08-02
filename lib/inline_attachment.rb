@@ -39,6 +39,20 @@ module ActionMailer
             got_inlines = false
             related_parts = []
           end
+          
+          if got_inlines && p.content_type =~ %r{multipart/alternative}i
+            p.parts.each_with_index do |p2,i2|
+              if got_inlines && p2.content_type =~ %r{text/html}i
+                p.parts[i2] = ActionMailer::Part.new( :content_type => "multipart/related" )
+                p.parts[i2].parts << p2
+                related_parts.each do |rp|
+                  p.parts[i2].parts << rp
+                end
+                got_inlines = false
+                related_parts = []
+              end
+            end
+          end
         end
         for_deletion.sort{|a,b|b<=>a}.each {|i|@parts.delete_at(i)}
         create_mail_without_inline_attachment
@@ -58,7 +72,7 @@ module ActionView
             file_path = source.sub(%r{file://}, '')
           else
             # Public image files
-            file_path = "#{RAILS_ROOT}/public#{path_to_image_without_inline_attachment(source).split('?').first}"
+            file_path = "#{RAILS_ROOT}/public#{compute_public_path(source, 'images', nil, false).split('?').first}"
           end
             
           if File.exists?(file_path)
